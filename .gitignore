@@ -1,0 +1,41 @@
+# Unity
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+*.csproj
+*.sln
+*.slnx
+*.suo
+*.user
+*.pidb
+*.booproj
+*.apk
+*.aab
+*.unitypackage
+.vs/
+.vscode/
+.idea/
+.DS_Store
+/.utmp/
+
+# Assets de la Asset Store (licencia EULA: no redistribuir en el repositorio)
+/Assets/Raptor3D/
+/Assets/Raptor3D.meta
+/Assets/POLYGRUNT - Lowpoly Rafale Jet/
+/Assets/POLYGRUNT - Lowpoly Rafale Jet.meta
+/Assets/Free car pack/
+/Assets/Free car pack.meta
+/Assets/mighty_handful/
+/Assets/mighty_handful.meta
+/Assets/FerociousIndustries/
+/Assets/FerociousIndustries.meta
+/Assets/Low Poly Mushrooms Pack/
+/Assets/Low Poly Mushrooms Pack.meta
+/Assets/Car and transportation sounds collection/
+/Assets/Car and transportation sounds collection.meta
