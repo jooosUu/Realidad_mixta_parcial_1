@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d9151ee1173f95442bcfe7d6f7a44f9d, type: 3}
+  m_Name: SoundBank
+  m_EditorClassIdentifier: Assembly-CSharp::MuseoAutista.SoundBank
+  entries:
+  - id: click
+    clip: {fileID: 8300000, guid: e0e06d5d8401646f882fce149c04f40e, type: 3}
+    volume: 0.7
+    pitch: 1
+  - id: grab
+    clip: {fileID: 8300000, guid: bde92cd6444974a0f85b3029923eac82, type: 3}
+    volume: 0.8
+    pitch: 1
+  - id: place
+    clip: {fileID: 8300000, guid: 1ff21ee5cac90462aaa17a9ebb59ab4c, type: 3}
+    volume: 0.9
+    pitch: 1
+  - id: error
+    clip: {fileID: 8300000, guid: 9abec19ce61764c779af95174eab2de7, type: 3}
+    volume: 0.5
+    pitch: 1
+  - id: teleport
+    clip: {fileID: 8300000, guid: 653ddababaca242c3941565caa5a98c2, type: 3}
+    volume: 0.45
+    pitch: 1
+  - id: success
+    clip: {fileID: 8300000, guid: 34ac763423f124ecf9f3f672b407b7f1, type: 3}
+    volume: 0.7
+    pitch: 1
