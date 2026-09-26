@@ -37,3 +37,7 @@ MonoBehaviour:
     clip: {fileID: 8300000, guid: 34ac763423f124ecf9f3f672b407b7f1, type: 3}
     volume: 0.7
     pitch: 1
+  - id: ticket
+    clip: {fileID: 8300000, guid: e0e06d5d8401646f882fce149c04f40e, type: 3}
+    volume: 0.9
+    pitch: 1.7

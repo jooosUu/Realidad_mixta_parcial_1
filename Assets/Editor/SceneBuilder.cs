@@ -209,6 +209,7 @@ namespace MuseoAutista.EditorTools
                 E("error", "2CV6MotorNoStart.wav", 0.5f),
                 E("teleport", "ElevatorStartToGo.wav", 0.45f),
                 E("success", "ElevatorStop.wav", 0.7f),
+                E("ticket", "ElevatorButton.wav", 0.9f, 1.7f),
             };
             EditorUtility.SetDirty(bank);
         }
@@ -529,6 +530,8 @@ namespace MuseoAutista.EditorTools
         {
             Lighting(new Color(0.80f, 0.82f, 0.90f), new Color(0.74f, 0.72f, 0.70f), new Color(0.52f, 0.50f, 0.48f),
                 Skybox("CieloDia", new Color(0.45f, 0.62f, 0.85f), new Color(0.55f, 0.62f, 0.50f), 1.15f), 1.0f);
+            ticketCount = 0;
+            beamMesh = null;
             var museum = new GameObject("Museo").transform;
             var lobby = Node("Pasillo", museum, Vector3.zero);
 
@@ -603,6 +606,7 @@ namespace MuseoAutista.EditorTools
                 "• Mira los <b>círculos azules</b> del suelo para avanzar por el pasillo.\n" +
                 "• Mira un <b>modelo</b> hasta llenar el anillo para animarlo.\n" +
                 "• Usa <b>Contemplar</b> en las placas para admirar una pieza.\n" +
+                "• Busca los <b>tickets dorados</b> escondidos en el museo.\n" +
                 "• La <b>X</b> del visor te lleva al menú principal.",
                 new Vector2(0f, -40f), new Vector2(2150f, 950f), 60, PanelText, TextAnchor.MiddleLeft);
             ButtonOnPanel("Menú principal", info.transform, -790f, ButtonAction.LoadScene, SceneNames.Inicio, true, 0.9f);
@@ -626,6 +630,9 @@ namespace MuseoAutista.EditorTools
                 ModelFactory.Bush(lobby, c + Vector3.up * 0.55f, 1f);
             }
 
+            MakeTicket(lobby, new Vector3(3.2f, 2.2f, 13f));
+            MakeTicket(lobby, new Vector3(-3.2f, 1.7f, z1 - 1f));
+
             // Puntos de salto del pasillo
             var start = Teleport(lobby, new Vector3(0f, 0f, z0 + 2f), "pasillo", "Salto_Entrada");
             Teleport(lobby, new Vector3(0f, 0f, zA), "pasillo", "Salto_Puertas1");
@@ -637,6 +644,7 @@ namespace MuseoAutista.EditorTools
             progress.sockets = sockets.ToArray();
             progress.progressTexts = progressTexts.ToArray();
             progress.finishButtons = finishButtons.ToArray();
+            progress.ticketsTotal = ticketCount;
 
             Rig(start.transform.position - Vector3.up * 0.02f, 0f, start);
         }
@@ -666,8 +674,9 @@ namespace MuseoAutista.EditorTools
             foreach (float x in new[] { -DoorHalf - 0.15f, DoorHalf + 0.15f })
                 Box(hall, new Vector3(x, DoorH / 2f, 0f), new Vector3(0.4f, DoorH, 0.7f), wains);
             Box(hall, new Vector3(0f, DoorH + 0.15f, 0f), new Vector3(DoorHalf * 2f + 0.7f, 0.3f, 0.7f), wains);
+            var lamps = new List<Renderer>();
             for (int i = 0; i < 3; i++)
-                Box(hall, new Vector3(0f, WallH - 0.03f, 4f + i * 5f), new Vector3(2.6f, 0.04f, 1.2f), Glow("Lampara", new Color(1f, 0.97f, 0.9f), 1f), false);
+                lamps.Add(Box(hall, new Vector3(0f, WallH - 0.03f, 4f + i * 5f), new Vector3(2.6f, 0.04f, 1.2f), Glow("Lampara", new Color(1f, 0.97f, 0.9f), 1f), false, false).GetComponent<Renderer>());
 
             // letrero sobre la puerta (lado vestíbulo) y mural del fondo
             var door = WorldCanvas("LetreroPuerta", hall, new Vector3(0f, (DoorH + 0.3f + WallH) / 2f, -0.37f), Quaternion.identity, new Vector2(6.2f, 1.1f), 100f);
@@ -681,9 +690,11 @@ namespace MuseoAutista.EditorTools
             Label(mural.transform, h.subtitle, new Vector2(0f, -45f), new Vector2(680f, 40f), 30, new Color(1f, 0.95f, 0.85f));
 
             // puntos de salto
-            Teleport(hall, new Vector3(0f, 0f, 3.5f), h.id, "Salto_" + h.id + "_1");
-            Teleport(hall, new Vector3(0f, 0f, 10.5f), h.id, "Salto_" + h.id + "_2");
-            Vector3 eye1 = new Vector3(0f, 1.6f, 3.5f), eye2 = new Vector3(0f, 1.6f, 10.5f);
+            Teleport(hall, new Vector3(0f, 0f, 2.0f), h.id, "Salto_" + h.id + "_0");
+            Teleport(hall, new Vector3(0f, 0f, 5.7f), h.id, "Salto_" + h.id + "_1");
+            Teleport(hall, new Vector3(0f, 0f, 9.2f), h.id, "Salto_" + h.id + "_M");
+            Teleport(hall, new Vector3(0f, 0f, 12.2f), h.id, "Salto_" + h.id + "_2");
+            Vector3 eye1 = new Vector3(0f, 1.6f, 5.7f), eye2 = new Vector3(0f, 1.6f, 12.2f);
 
             // exhibiciones
             switch (h.id)
@@ -695,13 +706,16 @@ namespace MuseoAutista.EditorTools
             }
 
             AddContemplateButtons(hall);
+            AddHallLights(hall, h, lamps);
+            MakeTicket(hall, new Vector3(6.3f, 4.2f, 2.2f));
+            MakeTicket(hall, h.id == "hongos" ? new Vector3(-1.2f, 0.7f, 13.5f) : new Vector3(6.2f, 4.8f, 16.9f));
 
             // pedestal de la pieza faltante
             string accepts = h.id == "aviones" ? "minijet" : h.id == "dinosaurios" ? "huevo" : h.id == "hongos" ? "hongo" : "minicarro";
             var sp = Node("PedestalPiezaFaltante", hall, new Vector3(4.3f, 0f, 13f));
             var socket = MakeSocket(sp, accepts, new Color(0.95f, 0.78f, 0.40f));
             sockets.Add(socket);
-            Vector3 signPos = new Vector3(2.9f, 1.95f, 12.2f);
+            Vector3 signPos = new Vector3(5.6f, 2.15f, 13.9f);
             var sign = Panel("CartelPiezaFaltante", hall, signPos, Facing(signPos, eye2), new Vector2(1.3f, 0.75f));
             AccentBar(sign, new Color(0.95f, 0.72f, 0.45f));
             Label(sign.transform, "PIEZA FALTANTE", new Vector2(0f, 280f), new Vector2(1250f, 80f), 58, PanelText, TextAnchor.MiddleCenter, FontStyle.Bold);
@@ -709,6 +723,93 @@ namespace MuseoAutista.EditorTools
             socket.waitingMessage = "Trae la pieza desde la mesa del pasillo\ny mira el aro amarillo para colocarla.";
             progressTexts.Add(Label(sign.transform, "", new Vector2(0f, -250f), new Vector2(1250f, 150f), 46, new Color(0.25f, 0.45f, 0.30f), TextAnchor.MiddleCenter));
             finishButtons.Add(ButtonOnPanel("Finalizar recorrido", sign.transform, -520f, ButtonAction.LoadScene, SceneNames.Felicitaciones, false, 0.95f).gameObject);
+        }
+
+        static Mesh beamMesh;
+
+        /// <summary>Tiras de luz del color de la sala + haces de luz sobre cada pieza (ver HallLights).</summary>
+        static void AddHallLights(Transform hall, HallDef h, List<Renderer> lamps)
+        {
+            var strips = new List<Renderer>();
+            var stripMat = Mat("TiraLuz_" + h.id, h.color, 0.1f, false, Color.black);
+            foreach (float x in new[] { -HalfW + 0.2f, HalfW - 0.2f })
+                strips.Add(Box(hall, new Vector3(x, WallH - 1.3f, HallLen / 2f), new Vector3(0.06f, 0.12f, HallLen - 0.6f), stripMat, false, false).GetComponent<Renderer>());
+            strips.Add(Box(hall, new Vector3(0f, WallH - 1.3f, HallLen - 0.2f), new Vector3(13.4f, 0.12f, 0.06f), stripMat, false, false).GetComponent<Renderer>());
+
+            if (beamMesh == null) beamMesh = BeamMesh();
+            var beamMat = AssetDatabase.LoadAssetAtPath<Material>(Gen + "/Materials/HazLuz.mat");
+            if (beamMat == null)
+            {
+                beamMat = new Material(Shader.Find("MuseoAutista/Beam")) { color = Color.black };
+                AssetDatabase.CreateAsset(beamMat, Gen + "/Materials/HazLuz.mat");
+            }
+            var beams = new List<Renderer>();
+            foreach (var ex in hall.GetComponentsInChildren<ExhibitAnimator>(true))
+            {
+                Vector3 local = hall.InverseTransformPoint(ex.transform.position);
+                if (local.y > 3f) continue; // el avión colgado ya está arriba
+                var go = new GameObject("HazDeLuz");
+                go.transform.SetParent(hall, false);
+                go.transform.localPosition = new Vector3(local.x, WallH - 0.05f, local.z);
+                go.AddComponent<MeshFilter>().sharedMesh = beamMesh;
+                var r = go.AddComponent<MeshRenderer>();
+                r.sharedMaterial = beamMat;
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                r.receiveShadows = false;
+                beams.Add(r);
+            }
+
+            var hl = hall.gameObject.AddComponent<HallLights>();
+            hl.hallId = h.id;
+            hl.hallColor = h.color;
+            hl.lamps = lamps.ToArray();
+            hl.strips = strips.ToArray();
+            hl.beams = beams.ToArray();
+        }
+
+        /// <summary>Cono abierto (desde el techo hacia abajo) con transparencia que se desvanece hacia el suelo.</summary>
+        static Mesh BeamMesh()
+        {
+            const int seg = 24;
+            float h = WallH - 0.3f, r0 = 0.15f, r1 = 1.4f;
+            var v = new List<Vector3>(); var n = new List<Vector3>(); var c = new List<Color>(); var t = new List<int>();
+            for (int i = 0; i <= seg; i++)
+            {
+                float a = i / (float)seg * Mathf.PI * 2f;
+                Vector3 d = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+                v.Add(d * r0); v.Add(d * r1 + Vector3.down * h);
+                n.Add(d); n.Add(d);
+                c.Add(new Color(1f, 1f, 1f, 1f)); c.Add(new Color(1f, 1f, 1f, 0f));
+                if (i < seg) { int k = i * 2; t.AddRange(new[] { k, k + 1, k + 2, k + 2, k + 1, k + 3 }); }
+            }
+            var m = new Mesh { name = "HazDeLuz" };
+            m.SetVertices(v); m.SetNormals(n); m.SetColors(c); m.SetTriangles(t, 0);
+            m.RecalculateBounds();
+            AssetDatabase.CreateAsset(m, Gen + "/Meshes/HazDeLuz.asset");
+            return m;
+        }
+
+        static int ticketCount;
+
+        /// <summary>Ticket dorado coleccionable (girando y flotando).</summary>
+        static void MakeTicket(Transform parent, Vector3 localPos)
+        {
+            ticketCount++;
+            var root = new GameObject("TicketDorado");
+            root.transform.SetParent(parent, false);
+            root.transform.localPosition = localPos;
+            var gold = Mat("OroTicket", new Color(0.98f, 0.80f, 0.30f), 0.6f, true, new Color(0.25f, 0.18f, 0.02f));
+            var dark = M("TicketFranja", new Color(0.75f, 0.45f, 0.20f));
+            Prim(PrimitiveType.Cube, root.transform, Vector3.zero, new Vector3(0.42f, 0.24f, 0.02f), gold);
+            Prim(PrimitiveType.Cube, root.transform, new Vector3(0.13f, 0f, 0f), new Vector3(0.015f, 0.22f, 0.025f), dark);
+            foreach (float z in new[] { -0.012f, 0.012f })
+            {
+                var cv = WorldCanvas("Texto", root.transform, new Vector3(-0.04f, 0f, z), Quaternion.Euler(0f, z > 0 ? 180f : 0f, 0f), new Vector2(0.3f, 0.2f));
+                Label(cv.transform, "TICKET", Vector2.zero, new Vector2(300f, 200f), 60, new Color(0.45f, 0.25f, 0.08f), TextAnchor.MiddleCenter, FontStyle.Bold);
+            }
+            var col = root.AddComponent<BoxCollider>();
+            col.size = new Vector3(0.6f, 0.4f, 0.3f);
+            root.AddComponent<Ticket>();
         }
 
         /// <summary>Agrega a cada placa de la sala un botón "Contemplar" ligado a la pieza más cercana.</summary>
@@ -738,7 +839,8 @@ namespace MuseoAutista.EditorTools
         // ---------------------------------------------------------------- contenido de cada sala
 
         static readonly Vector3 L6 = new Vector3(-4.3f, 0f, 6.5f), R6 = new Vector3(4.3f, 0f, 6.5f), L13 = new Vector3(-4.3f, 0f, 13f), C16 = new Vector3(0f, 0f, 15.6f);
-        static readonly Vector3 PL6 = new Vector3(-2.3f, 0f, 4.6f), PR6 = new Vector3(2.3f, 0f, 4.6f), PL13 = new Vector3(-2.3f, 0f, 11.4f), PC16 = new Vector3(1.9f, 0f, 13.5f);
+        static readonly Vector3 PL6 = new Vector3(-2.4f, 0f, 4.2f), PR6 = new Vector3(2.4f, 0f, 4.2f), PL13 = new Vector3(-2.4f, 0f, 10.8f), PC16 = new Vector3(2.6f, 0f, 14.3f);
+        static readonly Vector3 EyeMid = new Vector3(0f, 1.6f, 9.2f);
 
         static void FillAviones(Transform hall, Vector3 e1, Vector3 e2)
         {
@@ -786,9 +888,9 @@ namespace MuseoAutista.EditorTools
             var ped = Node("PedestalCraneo", hall, new Vector3(-5.5f, 0f, 9.75f));
             Pedestal(ped, 0.8f, acc, 0.65f);
             Place(ped, Exhibit("craneo_trex", () => ModelFactory.TRexSkull("Craneo_TRex"), true), new Vector3(0f, 0.8f, 0f), 90f, 1f);
-            Plaque(hall, new Vector3(-3.4f, 0f, 9.3f), e2, "Cráneo de T-Rex", "Medía 1,5 m. Sus dientes, del tamaño de un plátano, se renovaban durante toda su vida.", acc);
+            Plaque(hall, new Vector3(-3.2f, 0f, 8.3f), EyeMid, "Cráneo de T-Rex", "Medía 1,5 m. Sus dientes, del tamaño de un plátano, se renovaban durante toda su vida.", acc);
             Place(hall, Exhibit("raptor_fosil", () => ModelFactory.RaptorSkeleton("Esqueleto_Raptor"), true), new Vector3(5.4f, 0f, 9.75f), 0f, 0.85f);
-            Plaque(hall, new Vector3(3.4f, 0f, 9.3f), e2, "Fósil de Velociraptor", "Así se ve el raptor de al lado sin piel ni plumas: más de 200 huesos convertidos en piedra.", acc);
+            Plaque(hall, new Vector3(3.2f, 0f, 8.3f), EyeMid, "Fósil de Velociraptor", "Así se ve el raptor de al lado sin piel ni plumas: más de 200 huesos convertidos en piedra.", acc);
 
             var warn = WorldCanvas("CartelHumor", hall, new Vector3(-6.82f, 3.0f, 6.5f), Quaternion.Euler(0f, -90f, 0f), new Vector2(2.4f, 0.8f));
             Img(warn.transform, Vector2.zero, new Vector2(2400f, 800f), new Color(0.98f, 0.85f, 0.45f), RoundSprite, true);

@@ -56,6 +56,38 @@ namespace MuseoAutista.EditorTools
             }
         }
 
+        /// <summary>Desde el punto de salto más cercano, ¿se ve cada pieza y cada ticket sin que nada lo tape?</summary>
+        public static void SightCheck()
+        {
+            EditorSceneManager.OpenScene("Assets/Scenes/Recorrido.unity");
+            Physics.SyncTransforms();
+            var tps = Object.FindObjectsByType<MuseoAutista.TeleportPoint>(FindObjectsSortMode.None);
+            var targets = new System.Collections.Generic.List<Component>();
+            targets.AddRange(Object.FindObjectsByType<MuseoAutista.ExhibitAnimator>(FindObjectsSortMode.None));
+            targets.AddRange(Object.FindObjectsByType<MuseoAutista.Ticket>(FindObjectsSortMode.None));
+            int bad = 0;
+            foreach (var t in targets)
+            {
+                var col = t.GetComponent<Collider>();
+                if (col == null) continue;
+                Vector3 target = col.bounds.center;
+                MuseoAutista.TeleportPoint best = null;
+                float bd = float.MaxValue;
+                foreach (var tp in tps)
+                {
+                    float d = Vector3.Distance(tp.transform.position, target);
+                    if (d < bd && tp.transform.parent == t.transform.parent || d < bd && tp.transform.parent == t.transform.root) { }
+                    if (d < bd) { bd = d; best = tp; }
+                }
+                Vector3 eye = best.transform.position + Vector3.up * 1.6f;
+                bool hitSelf = Physics.Raycast(eye, (target - eye).normalized, out RaycastHit hit, 60f, ~0, QueryTriggerInteraction.Collide)
+                               && hit.collider.transform.IsChildOf(t.transform);
+                if (!hitSelf) bad++;
+                Debug.Log("[VISTA] " + t.name + " desde " + best.name + ": " + (hitSelf ? "OK" : "TAPADO por " + (hit.collider ? hit.collider.name + " (" + hit.collider.transform.parent?.name + ")" : "nada")));
+            }
+            Debug.Log("[VISTA] tapados: " + bad);
+        }
+
         public static void Debug1()
         {
             Directory.CreateDirectory("Screenshots");

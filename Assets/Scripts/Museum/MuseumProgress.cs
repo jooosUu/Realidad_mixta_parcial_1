@@ -12,15 +12,17 @@ namespace MuseoAutista
         public PlacementSocket[] sockets;
         public Text[] progressTexts;
         public GameObject[] finishButtons;
+        public int ticketsTotal;
 
-        void OnEnable() { PlacementSocket.AnyFilled += OnFilled; }
-        void OnDisable() { PlacementSocket.AnyFilled -= OnFilled; }
+        void OnEnable() { PlacementSocket.AnyFilled += OnFilled; Ticket.Collected += Refresh; }
+        void OnDisable() { PlacementSocket.AnyFilled -= OnFilled; Ticket.Collected -= Refresh; }
 
         void Awake() { GameState.StartTour(); }
 
         void Start()
         {
             GameState.PiecesTotal = sockets.Length;
+            GameState.TicketsTotal = ticketsTotal;
             foreach (var b in finishButtons) if (b) b.SetActive(false);
             Refresh();
         }
@@ -45,6 +47,7 @@ namespace MuseoAutista
             string msg = placed >= sockets.Length
                 ? "¡Misión completa! " + placed + "/" + sockets.Length + " piezas.\nMira \"Finalizar recorrido\"."
                 : "Piezas en su lugar: " + placed + "/" + sockets.Length;
+            if (ticketsTotal > 0) msg += "\nTickets dorados: " + GameState.TicketsCollected + "/" + ticketsTotal;
             foreach (var t in progressTexts) if (t) t.text = msg;
         }
     }

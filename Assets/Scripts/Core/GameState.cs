@@ -13,6 +13,8 @@ namespace MuseoAutista
 
         public static int PiecesPlaced { get; set; }
         public static int PiecesTotal { get; set; } = 4;
+        public static int TicketsCollected { get; set; }
+        public static int TicketsTotal { get; set; }
         public static float FinalSeconds { get; private set; }
         public static bool Finished { get; private set; }
 
@@ -30,6 +32,7 @@ namespace MuseoAutista
         {
             visited.Clear();
             PiecesPlaced = 0;
+            TicketsCollected = 0;
             Finished = false;
             startTime = Time.time;
         }

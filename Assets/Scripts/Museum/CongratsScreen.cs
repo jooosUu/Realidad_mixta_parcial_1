@@ -17,7 +17,8 @@ namespace MuseoAutista
                 int s = Mathf.RoundToInt(GameState.FinalSeconds);
                 statsText.text = "Tiempo del recorrido: " + (s / 60) + " min " + (s % 60).ToString("00") + " s\n" +
                                  "Piezas devueltas: " + GameState.PiecesPlaced + "/" + GameState.PiecesTotal + "\n" +
-                                 "Salas visitadas: " + GameState.HallsVisited + "/" + GameState.Halls.Length;
+                                 "Salas visitadas: " + GameState.HallsVisited + "/" + GameState.Halls.Length +
+                                 (GameState.TicketsTotal > 0 ? "\nTickets dorados: " + GameState.TicketsCollected + "/" + GameState.TicketsTotal : "");
             }
             else
             {
