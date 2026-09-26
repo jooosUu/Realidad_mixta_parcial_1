@@ -13,23 +13,47 @@ namespace MuseoAutista.EditorTools
         {
             Directory.CreateDirectory("Screenshots");
             Shoot("Inicio", "inicio_menu", new Vector3(0f, 1.6f, 0f), new Vector3(0f, 1.5f, 3f));
+            Shoot("Inicio", "inicio_reproductor", new Vector3(0f, 1.6f, 0f), new Vector3(-0.5f, 1.0f, 0.9f), 60f);
             Shoot("Inicio", "inicio_general", new Vector3(0f, 3.5f, -6f), new Vector3(0f, 3f, 12f));
             Shoot("Tutorial", "tutorial_inicio", new Vector3(0f, 1.6f, 0f), new Vector3(0f, 1.4f, 5f));
             Shoot("Tutorial", "tutorial_sala", new Vector3(0f, 1.6f, 5f), new Vector3(0f, 1.3f, 11f));
-            Shoot("Recorrido", "recorrido_vestibulo", new Vector3(0f, 1.6f, -4.2f), new Vector3(0f, 1.4f, 3f));
-            Shoot("Recorrido", "recorrido_aviones", new Vector3(0f, 1.6f, 10.5f), new Vector3(0f, 1.8f, 20f));
-            Shoot("Recorrido", "recorrido_aviones_2", new Vector3(0f, 1.6f, 10.5f), new Vector3(-4f, 1.4f, 11f));
-            Shoot("Recorrido", "recorrido_dinos", new Vector3(10.5f, 1.6f, 0f), new Vector3(20f, 1.8f, 0f));
-            Shoot("Recorrido", "recorrido_dinos_trex", new Vector3(10.5f, 1.6f, 0f), new Vector3(13.5f, 1.4f, 4.3f));
-            Shoot("Recorrido", "recorrido_dinos_raptor", new Vector3(11f, 1.8f, 1.5f), new Vector3(13.5f, 0.9f, 4.3f));
-            Shoot("Recorrido", "recorrido_dinos_stego", new Vector3(11f, 1.8f, -1.5f), new Vector3(13.5f, 1.0f, -4.3f));
-            Shoot("Recorrido", "recorrido_fosiles", new Vector3(0f, 1.6f, -10.5f), new Vector3(0f, 1.5f, -20f));
-            Shoot("Recorrido", "recorrido_fosiles_raptor", new Vector3(0f, 1.6f, -10.5f), new Vector3(4f, 1.2f, -13.5f));
-            Shoot("Recorrido", "recorrido_carros", new Vector3(-10.5f, 1.6f, 0f), new Vector3(-20f, 1.3f, 0f));
-            Shoot("Recorrido", "recorrido_carros_2", new Vector3(-10.5f, 1.6f, 0f), new Vector3(-13.5f, 1.0f, -4.3f));
-            Shoot("Recorrido", "recorrido_cenital", new Vector3(0f, 45f, 0f), new Vector3(0f, 0f, 0.01f), 70f);
+            Shoot("Recorrido", "recorrido_pasillo", new Vector3(0f, 1.6f, -7f), new Vector3(0f, 1.8f, 10f));
+            Shoot("Recorrido", "recorrido_pasillo_mesa", new Vector3(0f, 1.6f, -7f), new Vector3(-2.2f, 0.9f, -2.5f));
+            Shoot("Recorrido", "recorrido_pasillo_puertas", new Vector3(0f, 1.6f, 5f), new Vector3(-6f, 3f, 5f));
+            HallShot("aviones", "recorrido_aviones", new Vector3(0f, 1.8f, 16f));
+            HallShot("dinosaurios", "recorrido_dinos", new Vector3(0f, 1.8f, 16f));
+            HallShot("dinosaurios", "recorrido_dinos_raptor", new Vector3(-4.3f, 1.0f, 6.5f));
+            HallShot("hongos", "recorrido_hongos", new Vector3(0f, 1.6f, 16f));
+            HallShot("carros", "recorrido_carros", new Vector3(0f, 1.3f, 16f));
+            Shoot("Recorrido", "recorrido_cenital", new Vector3(0f, 60f, 13f), new Vector3(0f, 0f, 13.01f), 75f);
             Shoot("Felicitaciones", "felicitaciones", new Vector3(0f, 1.6f, 0f), new Vector3(0f, 1.7f, 3f));
             Debug.Log("[MuseoAutista] Capturas guardadas en Screenshots/");
+        }
+
+        /// <summary>Simula el rayo Gaze hacia cada pieza de la mesa y cada pedestal para comprobar que se pueden apuntar.</summary>
+        public static void GazeCheck()
+        {
+            EditorSceneManager.OpenScene("Assets/Scenes/Recorrido.unity");
+            Physics.SyncTransforms();
+            Vector3 eye = new Vector3(0f, 1.6f, -7f);
+            foreach (var g in Object.FindObjectsByType<MuseoAutista.Grabbable>(FindObjectsSortMode.None))
+            {
+                Vector3 target = g.transform.position + Vector3.up * 0.2f;
+                bool ok = Physics.Raycast(eye, (target - eye).normalized, out RaycastHit hit, 40f, ~0, QueryTriggerInteraction.Collide)
+                          && hit.collider.GetComponentInParent<MuseoAutista.Grabbable>() == g;
+                Debug.Log("[GAZE] pieza " + g.itemId + ": " + (ok ? "OK" : "BLOQUEADA por " + (hit.collider ? hit.collider.name : "nada")));
+            }
+            foreach (var s in Object.FindObjectsByType<MuseoAutista.PlacementSocket>(FindObjectsSortMode.None))
+            {
+                var hall = s.transform.root.GetComponentsInChildren<Transform>();
+                Transform tp = null;
+                foreach (var t in hall) if (t.name.EndsWith("_2") && t.name.StartsWith("Salto_") && s.transform.IsChildOf(t.parent)) tp = t;
+                Vector3 from = (tp != null ? tp.position : s.transform.position + Vector3.back * 3f) + Vector3.up * 1.6f;
+                Vector3 target = s.transform.position + Vector3.up * 0.1f;
+                bool ok = Physics.Raycast(from, (target - from).normalized, out RaycastHit hit, 40f, ~0, QueryTriggerInteraction.Collide)
+                          && hit.collider.GetComponentInParent<MuseoAutista.PlacementSocket>() == s;
+                Debug.Log("[GAZE] pedestal " + s.acceptsItemId + ": " + (ok ? "OK" : "BLOQUEADO por " + (hit.collider ? hit.collider.name : "nada")));
+            }
         }
 
         public static void Debug1()
@@ -74,6 +98,15 @@ namespace MuseoAutista.EditorTools
                 RenderTexture.active = null;
                 cam.targetTexture = null;
             }
+        }
+
+        static void HallShot(string hallId, string file, Vector3 lookLocal)
+        {
+            if (EditorSceneManager.GetActiveScene().path != "Assets/Scenes/Recorrido.unity") EditorSceneManager.OpenScene("Assets/Scenes/Recorrido.unity");
+            var hall = GameObject.Find("Sala_" + hallId);
+            if (hall == null) return;
+            Vector3 from = hall.transform.TransformPoint(new Vector3(0f, 1.6f, 3.5f));
+            Shoot("Recorrido", file, from, hall.transform.TransformPoint(lookLocal));
         }
 
         static void Shoot(string scene, string file, Vector3 pos, Vector3 look, float fov = 80f)

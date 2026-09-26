@@ -9,7 +9,7 @@ Es un museo de "intereses especiales" con estilo cartoon: **aviones de combate, 
 |---|---|
 | **Inicio** | Plaza frente al museo, menú con Tutorial / Recorrido / Salir y paneles de instrucciones. |
 | **Tutorial** | 6 pasos guiados: puntero Gaze, teletransporte, agarrar, colocar y animar un modelo. |
-| **Recorrido** | Vestíbulo + 4 salas (Aviones, Dinosaurios, Hongos, Carros), 12 puntos de salto y una misión: devolver 4 piezas perdidas a su sala. |
+| **Recorrido** | Pasillo largo con 4 entradas enormes a las salas (Aviones, Dinosaurios, Hongos, Carros), 13 puntos de salto y una misión: devolver 4 piezas perdidas a su sala. |
 | **Felicitaciones** | Trofeo, confeti, resumen (tiempo, piezas y salas visitadas) y botones Inicio / Repetir / Salir. |
 
 ## Mecánicas
@@ -18,6 +18,8 @@ Es un museo de "intereses especiales" con estilo cartoon: **aviones de combate, 
 - **Teletransporte**: círculos azules en el suelo con un fundido corto a negro para evitar mareo.
 - **Agarre y posicionamiento**: al mirar una pieza, esta flota delante de la cámara. Se coloca mirando el pedestal con el aro amarillo, que solo acepta la pieza correcta y avisa si no lo es.
 - **Animaciones**: los aviones encienden la postcombustión y despegan, los dinosaurios rugen, los fósiles se desarman y se vuelven a armar, y los carros encienden luces y giran las ruedas. Todo con sonidos sintetizados.
+- **Contemplar**: cada placa tiene un botón *Contemplar*. Al usarlo, lo que está detrás de la pieza se oscurece como un foco de museo, la pieza gira lentamente, suena el audio de contemplación y la música baja. Termina a los 20 s o con *Dejar de contemplar*.
+- **Reproductor de música**: ícono abajo a la izquierda de la vista (sigue al cuerpo, no a la cabeza). Al mirarlo se abre con la portada de la canción, anterior / play-pausa / siguiente y *música del celular*, que lee las carpetas Music y Download. Se esconde solo al dejar de mirarlo.
 - **Cardboard**: escaneo del QR del visor, botón ⚙ (configurar), botón X (volver al inicio o salir desde el inicio) y recentrado manteniendo pulsado el visor.
 
 ## Usabilidad / confort visual

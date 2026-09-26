@@ -22,7 +22,10 @@ namespace MuseoAutista.EditorTools
     public static class SceneBuilder
     {
         const string SceneDir = "Assets/Scenes";
-        const float WallH = 6f;
+        const float WallH = 7f;
+        const float DoorH = 5.5f;
+        const float DoorHalf = 3f;
+        const float CorridorHalf = 4f;
         const float HallLen = 18f;
         const float HalfW = 7f;
 
@@ -109,7 +112,8 @@ namespace MuseoAutista.EditorTools
             foreach (var f in Directory.GetFiles(Gen + "/Meshes", "*.asset")) AssetDatabase.DeleteAsset(f.Replace('\\', '/'));
             var lighting = LightingAsset();
             CreateSoundBank();
-            var music = FindMusic();
+            CreateContemplationAssets();
+            var songs = ImportSongs(out var covers);
 
             var scenes = new List<EditorBuildSettingsScene>();
             foreach (var (name, build) in new (string, Action)[]
@@ -124,11 +128,9 @@ namespace MuseoAutista.EditorTools
                 var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
                 Lightmapping.lightingSettings = lighting;
                 build();
-                if (music != null)
-                {
-                    var mp = new GameObject("Musica").AddComponent<MusicPlayer>();
-                    mp.music = music;
-                }
+                var mp = new GameObject("Musica").AddComponent<MusicPlayer>();
+                mp.bundled = songs;
+                mp.bundledCovers = covers;
                 string path = SceneDir + "/" + name + ".unity";
                 EditorSceneManager.SaveScene(scene, path);
                 Lightmapping.Bake();
@@ -178,6 +180,16 @@ namespace MuseoAutista.EditorTools
             Screenshots.CaptureAll();
         }
 
+        static void CreateContemplationAssets()
+        {
+            if (!AssetDatabase.IsValidFolder("Assets/Resources")) AssetDatabase.CreateFolder("Assets", "Resources");
+            const string path = "Assets/Resources/ContemplacionDomo.mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null) { m = new Material(Shader.Find("MuseoAutista/Dim")); AssetDatabase.CreateAsset(m, path); }
+            m.color = new Color(0.02f, 0.02f, 0.04f, 0f);
+            EditorUtility.SetDirty(m);
+        }
+
         /// <summary>Sonidos de la interfaz tomados del pack "Car and transportation sounds collection".</summary>
         static void CreateSoundBank()
         {
@@ -201,21 +213,71 @@ namespace MuseoAutista.EditorTools
             EditorUtility.SetDirty(bank);
         }
 
-        /// <summary>Primera pista de audio en Assets/Audio/Musica (si existe) para la música de fondo.</summary>
-        static AudioClip FindMusic()
+        /// <summary>
+        /// Copia las canciones sueltas (.mp3/.ogg/.wav) de la carpeta "Musica" (junto al proyecto)
+        /// a Assets/Audio/Musica y las configura comprimidas y en streaming.
+        /// </summary>
+        static List<AudioClip> ImportSongs(out List<Texture2D> covers)
         {
-            if (!AssetDatabase.IsValidFolder("Assets/Audio/Musica")) return null;
-            foreach (var guid in AssetDatabase.FindAssets("t:AudioClip", new[] { "Assets/Audio/Musica" }))
+            covers = new List<Texture2D>();
+            string src = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", "Musica"));
+            const string dst = "Assets/Audio/Musica";
+            if (!AssetDatabase.IsValidFolder("Assets/Audio")) AssetDatabase.CreateFolder("Assets", "Audio");
+            if (!AssetDatabase.IsValidFolder(dst)) AssetDatabase.CreateFolder("Assets/Audio", "Musica");
+            if (Directory.Exists(src))
+                foreach (var f in Directory.GetFiles(src))
+                {
+                    string ext = Path.GetExtension(f).ToLowerInvariant();
+                    if (ext != ".mp3" && ext != ".ogg" && ext != ".wav") continue;
+                    string target = Path.Combine(dst, Path.GetFileName(f));
+                    if (!File.Exists(target)) File.Copy(f, target);
+                }
+            AssetDatabase.Refresh();
+            var clips = new List<AudioClip>();
+            foreach (var guid in AssetDatabase.FindAssets("t:AudioClip", new[] { dst }))
             {
                 string p = AssetDatabase.GUIDToAssetPath(guid);
                 var imp = (AudioImporter)AssetImporter.GetAtPath(p);
                 var set = imp.defaultSampleSettings;
-                set.loadType = AudioClipLoadType.Streaming;
-                imp.defaultSampleSettings = set;
-                imp.SaveAndReimport();
-                return AssetDatabase.LoadAssetAtPath<AudioClip>(p);
+                if (set.loadType != AudioClipLoadType.Streaming || set.compressionFormat != AudioCompressionFormat.Vorbis)
+                {
+                    set.loadType = AudioClipLoadType.Streaming;
+                    set.compressionFormat = AudioCompressionFormat.Vorbis;
+                    set.quality = 0.4f;
+                    set.sampleRateSetting = AudioSampleRateSetting.OptimizeSampleRate;
+                    imp.defaultSampleSettings = set;
+                    imp.SaveAndReimport();
+                }
+                clips.Add(AssetDatabase.LoadAssetAtPath<AudioClip>(p));
             }
-            return null;
+            clips.Sort((x, y) => string.Compare(x.name, y.name, StringComparison.OrdinalIgnoreCase));
+
+            // Portadas incrustadas en los MP3 (etiqueta ID3) -> texturas.
+            const string coverDir = "Assets/Audio/Portadas";
+            if (!AssetDatabase.IsValidFolder(coverDir)) AssetDatabase.CreateFolder("Assets/Audio", "Portadas");
+            foreach (var c in clips)
+            {
+                Texture2D tex = null;
+                byte[] img = Id3Cover.FromFile(Path.GetFullPath(AssetDatabase.GetAssetPath(c)));
+                if (img != null)
+                {
+                    bool png = img.Length > 4 && img[0] == 0x89 && img[1] == 0x50;
+                    string cp = coverDir + "/" + c.name + (png ? ".png" : ".jpg");
+                    if (!File.Exists(cp))
+                    {
+                        File.WriteAllBytes(cp, img);
+                        AssetDatabase.ImportAsset(cp);
+                        var ti = (TextureImporter)AssetImporter.GetAtPath(cp);
+                        ti.maxTextureSize = 256;
+                        ti.wrapMode = TextureWrapMode.Clamp;
+                        ti.SaveAndReimport();
+                    }
+                    tex = AssetDatabase.LoadAssetAtPath<Texture2D>(cp);
+                }
+                covers.Add(tex);
+            }
+            Debug.Log("[MuseoAutista] Canciones incluidas: " + clips.Count);
+            return clips;
         }
 
         static LightingSettings LightingAsset()
@@ -322,7 +384,8 @@ namespace MuseoAutista.EditorTools
                 "• El <b>punto blanco</b> es tu puntero.\n\n" +
                 "• Mira un objeto: el <b>anillo</b> se llena y se activa.\n\n" +
                 "• Los <b>círculos azules</b> del suelo te teletransportan.\n\n" +
-                "• Mantén pulsado el visor para <b>recentrar</b>.",
+                "• Mantén pulsado el visor para <b>recentrar</b>.\n\n" +
+                "• Abajo a la izquierda está el <b>reproductor de música</b>: míralo para abrirlo.",
                 new Vector2(0f, -80f), new Vector2(1350f, 1200f), 60, PanelText, TextAnchor.UpperLeft);
 
             Vector3 rp = new Vector3(2.7f, 1.6f, 1.3f);
@@ -340,12 +403,12 @@ namespace MuseoAutista.EditorTools
             Rig(Vector3.zero, 0f, null);
         }
 
-        static GazeButton ButtonOnPanel(string label, Transform panel, float yMm, ButtonAction action, string scene, bool danger, float widthM = 1.25f)
+        static GazeButton ButtonOnPanel(string label, Transform panel, float yMm, ButtonAction action, string scene, bool danger, float widthM = 1.25f, int fontSize = 0, float heightM = 0.24f)
         {
             // El panel usa escala 1/1000; el botón se coloca en coordenadas del padre del canvas.
             var parent = panel.parent;
             Vector3 world = panel.TransformPoint(new Vector3(0f, yMm, -40f));
-            var b = Button(label, parent, parent.InverseTransformPoint(world), panel.localRotation, new Vector2(widthM, 0.24f), action, scene, danger);
+            var b = Button(label, parent, parent.InverseTransformPoint(world), panel.localRotation, new Vector2(widthM, heightM), action, scene, danger, fontSize);
             return b;
         }
 
@@ -467,19 +530,38 @@ namespace MuseoAutista.EditorTools
             Lighting(new Color(0.80f, 0.82f, 0.90f), new Color(0.74f, 0.72f, 0.70f), new Color(0.52f, 0.50f, 0.48f),
                 Skybox("CieloDia", new Color(0.45f, 0.62f, 0.85f), new Color(0.55f, 0.62f, 0.50f), 1.15f), 1.0f);
             var museum = new GameObject("Museo").transform;
-            var lobby = Node("Vestibulo", museum, Vector3.zero);
+            var lobby = Node("Pasillo", museum, Vector3.zero);
 
-            // Vestíbulo
-            Box(lobby, new Vector3(0f, -0.05f, 0f), new Vector3(14f, 0.1f, 14f), Floor("PisoVestibulo", new Color(0.93f, 0.86f, 0.74f), new Vector2(3.5f, 3.5f)));
-            Box(lobby, new Vector3(0f, WallH + 0.05f, 0f), new Vector3(14.3f, 0.1f, 14.3f), Mat("Techo", new Color(0.95f, 0.94f, 0.92f), 0.1f, false, new Color(0.30f, 0.30f, 0.29f)));
-            Box(lobby, new Vector3(0f, WallH - 0.03f, 0f), new Vector3(3f, 0.04f, 3f), Glow("Lampara", new Color(1f, 0.97f, 0.9f), 1f), false);
+            // Pasillo largo con las 4 salas a los lados (entradas enormes).
+            const float z0 = -9f, z1 = 35f, zA = 5f, zB = 21f;
+            float len = z1 - z0, zc = (z0 + z1) / 2f;
+            var corridorWall = WallMat("ParedPasillo", new Color(0.95f, 0.92f, 0.86f));
+            Box(lobby, new Vector3(0f, -0.05f, zc), new Vector3(CorridorHalf * 2f, 0.1f, len), Floor("PisoPasillo", new Color(0.93f, 0.86f, 0.74f), new Vector2(2f, 11f)));
+            Box(lobby, new Vector3(0f, 0.005f, zc), new Vector3(2.4f, 0.01f, len - 1f), Mat("Alfombra", new Color(0.62f, 0.36f, 0.34f)), false);
+            Box(lobby, new Vector3(0f, WallH + 0.05f, zc), new Vector3(CorridorHalf * 2f + 0.3f, 0.1f, len + 0.3f), Mat("Techo", new Color(0.95f, 0.94f, 0.92f), 0.1f, false, new Color(0.30f, 0.30f, 0.29f)));
+            for (float z = z0 + 3f; z < z1; z += 5f)
+                Box(lobby, new Vector3(0f, WallH - 0.03f, z), new Vector3(2.4f, 0.04f, 1.4f), Glow("Lampara", new Color(1f, 0.97f, 0.9f), 1f), false);
+            // tramos de pared del pasillo que no cubren las salas
+            foreach (float x in new[] { -CorridorHalf, CorridorHalf })
+                foreach (var seg in new[] { new Vector2(z0, zA - HalfW), new Vector2(zA + HalfW, zB - HalfW), new Vector2(zB + HalfW, z1) })
+                {
+                    float l = seg.y - seg.x;
+                    Box(lobby, new Vector3(x, WallH / 2f, (seg.x + seg.y) / 2f), new Vector3(0.3f, WallH, l + 0.3f), corridorWall);
+                    Box(lobby, new Vector3(x - Mathf.Sign(x) * 0.16f, 0.6f, (seg.x + seg.y) / 2f), new Vector3(0.02f, 1.2f, l), Trim, false);
+                }
+            Box(lobby, new Vector3(0f, WallH / 2f, z0), new Vector3(CorridorHalf * 2f + 0.3f, WallH, 0.3f), corridorWall);
+            Box(lobby, new Vector3(0f, WallH / 2f, z1), new Vector3(CorridorHalf * 2f + 0.3f, WallH, 0.3f), corridorWall);
+            var endSign = WorldCanvas("MuralPasillo", lobby, new Vector3(0f, 4.2f, z1 - 0.17f), Quaternion.identity, new Vector2(7f, 2f), 100f);
+            Img(endSign.transform, Vector2.zero, new Vector2(700f, 200f), new Color(0.30f, 0.45f, 0.60f), RoundSprite, true);
+            Label(endSign.transform, "MUSEO AUTISTA", new Vector2(0f, 25f), new Vector2(680f, 110f), 80, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
+            Label(endSign.transform, "aviones · dinosaurios · hongos · carros", new Vector2(0f, -55f), new Vector2(680f, 40f), 30, new Color(1f, 0.93f, 0.75f));
 
             var halls = new[]
             {
-                new HallDef { id = "aviones", name = "Sala de Aviones", title = "AVIONES DE COMBATE", subtitle = "Máquinas que rompen la barrera del sonido", direction = "al frente", color = AvionesColor, yaw = 0f, origin = new Vector3(0f, 0f, HalfW) },
-                new HallDef { id = "dinosaurios", name = "Sala de Dinosaurios", title = "DINOSAURIOS", subtitle = "Gigantes del Mesozoico (muy seguros)", direction = "a la derecha", color = DinosColor, yaw = 90f, origin = new Vector3(HalfW, 0f, 0f) },
-                new HallDef { id = "hongos", name = "Sala de Hongos", title = "HONGOS", subtitle = "Ni plantas ni animales: un reino aparte", direction = "detrás de ti", color = HongosColor, yaw = 180f, origin = new Vector3(0f, 0f, -HalfW) },
-                new HallDef { id = "carros", name = "Sala de Carros", title = "CARROS", subtitle = "Ruedas, motores y velocidad", direction = "a la izquierda", color = CarrosColor, yaw = 270f, origin = new Vector3(-HalfW, 0f, 0f) },
+                new HallDef { id = "aviones", name = "Sala de Aviones", title = "AVIONES DE COMBATE", subtitle = "Máquinas que rompen la barrera del sonido", direction = "1ª puerta a la izquierda", color = AvionesColor, yaw = 270f, origin = new Vector3(-CorridorHalf, 0f, zA) },
+                new HallDef { id = "dinosaurios", name = "Sala de Dinosaurios", title = "DINOSAURIOS", subtitle = "Gigantes del Mesozoico (muy seguros)", direction = "1ª puerta a la derecha", color = DinosColor, yaw = 90f, origin = new Vector3(CorridorHalf, 0f, zA) },
+                new HallDef { id = "hongos", name = "Sala de Hongos", title = "HONGOS", subtitle = "Ni plantas ni animales: un reino aparte", direction = "2ª puerta a la izquierda", color = HongosColor, yaw = 270f, origin = new Vector3(-CorridorHalf, 0f, zB) },
+                new HallDef { id = "carros", name = "Sala de Carros", title = "CARROS", subtitle = "Ruedas, motores y velocidad", direction = "2ª puerta a la derecha", color = CarrosColor, yaw = 90f, origin = new Vector3(CorridorHalf, 0f, zB) },
             };
 
             var sockets = new List<PlacementSocket>();
@@ -488,9 +570,9 @@ namespace MuseoAutista.EditorTools
             foreach (var h in halls)
                 BuildHall(museum, h, sockets, progressTexts, finishButtons);
 
-            // Mesa de restauración con las 4 piezas
-            Vector3 eye = new Vector3(0f, 1.6f, -4.2f);
-            var table = Node("MesaRestauracion", lobby, Vector3.zero);
+            // Mesa de restauración con las 4 piezas (a un lado para no tapar el pasillo)
+            Vector3 eye = new Vector3(0f, 1.6f, z0 + 2f);
+            var table = Node("MesaRestauracion", lobby, new Vector3(-2.2f, 0f, z0 + 6.5f));
             Prim(PrimitiveType.Cylinder, table, new Vector3(0f, 0.43f, 0f), new Vector3(1.6f, 0.43f, 1.6f), Wood, default, true);
             Prim(PrimitiveType.Cylinder, table, new Vector3(0f, 0.88f, 0f), new Vector3(2.1f, 0.03f, 2.1f), M("MesaTapa", new Color(0.85f, 0.70f, 0.55f)), default, true);
             MakeStatic(table.gameObject);
@@ -503,49 +585,53 @@ namespace MuseoAutista.EditorTools
             };
             for (int i = 0; i < items.Length; i++)
             {
-                Vector3 p = new Vector3(-0.72f + i * 0.48f, 0.91f, -0.25f);
+                // En fila, perpendicular a la mirada desde la entrada, para que ninguna tape a otra.
+                Vector3 view = (table.localPosition - new Vector3(eye.x, 0f, eye.z)).normalized;
+                Vector3 across = new Vector3(view.z, 0f, -view.x);
+                Vector3 p = table.localPosition + across * (-0.75f + i * 0.5f) + Vector3.up * 0.91f;
                 var g = MakeGrabbable(items[i].model, lobby, p, items[i].id, items[i].name, items[i].hall);
                 g.transform.localScale = Vector3.one * 1.25f;
-                g.transform.rotation = Quaternion.Euler(0f, 200f, 0f);
+                g.transform.rotation = Quaternion.Euler(0f, 160f, 0f);
             }
 
-            // Carteles del vestíbulo
-            Vector3 ip = new Vector3(-3.0f, 2.05f, -1.6f);
+            // Carteles de la entrada
+            Vector3 ip = new Vector3(-2.7f, 2.05f, z0 + 4.2f);
             var info = Panel("Instrucciones", lobby, ip, Facing(ip, eye), new Vector2(2.3f, 1.3f));
             AccentBar(info, new Color(0.55f, 0.80f, 0.85f));
             Label(info.transform, "¡Bienvenido al Museo Autista!", new Vector2(0f, 530f), new Vector2(2200f, 110f), 86, PanelText, TextAnchor.MiddleCenter, FontStyle.Bold);
             Label(info.transform,
-                "• Mira los <b>círculos azules</b> del suelo para moverte entre salas.\n" +
+                "• Mira los <b>círculos azules</b> del suelo para avanzar por el pasillo.\n" +
                 "• Mira un <b>modelo</b> hasta llenar el anillo para animarlo.\n" +
-                "• Lee las placas para conocer cada pieza.\n" +
+                "• Usa <b>Contemplar</b> en las placas para admirar una pieza.\n" +
                 "• La <b>X</b> del visor te lleva al menú principal.",
                 new Vector2(0f, -40f), new Vector2(2150f, 950f), 60, PanelText, TextAnchor.MiddleLeft);
             ButtonOnPanel("Menú principal", info.transform, -790f, ButtonAction.LoadScene, SceneNames.Inicio, true, 0.9f);
 
-            Vector3 mp = new Vector3(3.0f, 2.05f, -1.6f);
+            Vector3 mp = new Vector3(2.7f, 2.05f, z0 + 4.2f);
             var mission = Panel("Mision", lobby, mp, Facing(mp, eye), new Vector2(2.3f, 1.3f));
             AccentBar(mission, new Color(0.95f, 0.72f, 0.45f));
             Label(mission.transform, "MISIÓN: piezas perdidas", new Vector2(0f, 530f), new Vector2(2200f, 110f), 86, PanelText, TextAnchor.MiddleCenter, FontStyle.Bold);
             string list = "";
             for (int i = 0; i < items.Length; i++)
-                list += "• <b>" + items[i].name + "</b>: " + halls[i].title.ToLower() + " (" + halls[i].direction + ")\n";
+                list += "• <b>" + items[i].name + "</b>: " + halls[i].direction + "\n";
             Label(mission.transform, "Lleva cada pieza de la mesa al aro\namarillo de su sala:\n" + list,
                 new Vector2(0f, 20f), new Vector2(2100f, 800f), 64, PanelText, TextAnchor.MiddleLeft);
             progressTexts.Add(Label(mission.transform, "", new Vector2(0f, -520f), new Vector2(2150f, 130f), 58, new Color(0.25f, 0.45f, 0.30f), TextAnchor.MiddleCenter));
             finishButtons.Add(ButtonOnPanel("Finalizar recorrido", mission.transform, -790f, ButtonAction.LoadScene, SceneNames.Felicitaciones, false, 1.0f).gameObject);
 
-            // Decoración del vestíbulo
-            foreach (var c in new[] { new Vector3(-5.9f, 0f, -5.9f), new Vector3(5.9f, 0f, -5.9f), new Vector3(-5.9f, 0f, 5.9f), new Vector3(5.9f, 0f, 5.9f) })
+            // Decoración: macetas junto a las puertas y al fondo
+            foreach (var c in new[] { new Vector3(-3.1f, 0f, z0 + 1f), new Vector3(3.1f, 0f, z0 + 1f), new Vector3(-3.1f, 0f, 13f), new Vector3(3.1f, 0f, 13f), new Vector3(-3.1f, 0f, z1 - 1f), new Vector3(3.1f, 0f, z1 - 1f) })
             {
                 Prim(PrimitiveType.Cylinder, lobby, c + Vector3.up * 0.3f, new Vector3(1.1f, 0.3f, 1.1f), M("Maceta", new Color(0.85f, 0.55f, 0.45f)));
                 ModelFactory.Bush(lobby, c + Vector3.up * 0.55f, 1f);
             }
 
-            // Puntos de salto del vestíbulo
-            var start = Teleport(lobby, new Vector3(0f, 0f, -4.2f), "vestibulo", "Salto_Entrada");
-            Teleport(lobby, new Vector3(0f, 0f, 4.3f), "vestibulo", "Salto_Norte");
-            Teleport(lobby, new Vector3(4.3f, 0f, 0f), "vestibulo", "Salto_Este");
-            Teleport(lobby, new Vector3(-4.3f, 0f, 0f), "vestibulo", "Salto_Oeste");
+            // Puntos de salto del pasillo
+            var start = Teleport(lobby, new Vector3(0f, 0f, z0 + 2f), "pasillo", "Salto_Entrada");
+            Teleport(lobby, new Vector3(0f, 0f, zA), "pasillo", "Salto_Puertas1");
+            Teleport(lobby, new Vector3(0f, 0f, 13f), "pasillo", "Salto_Centro");
+            Teleport(lobby, new Vector3(0f, 0f, zB), "pasillo", "Salto_Puertas2");
+            Teleport(lobby, new Vector3(0f, 0f, z1 - 4f), "pasillo", "Salto_Fondo");
 
             var progress = new GameObject("Progreso").AddComponent<MuseumProgress>();
             progress.sockets = sockets.ToArray();
@@ -563,10 +649,11 @@ namespace MuseoAutista.EditorTools
 
             Box(hall, new Vector3(0f, -0.05f, HallLen / 2f), new Vector3(14f, 0.1f, HallLen), Floor("Piso_" + h.id, Pastel(h.color, 0.55f), new Vector2(3.5f, 4.5f)));
             Box(hall, new Vector3(0f, WallH + 0.05f, HallLen / 2f), new Vector3(14.3f, 0.1f, HallLen + 0.3f), Mat("Techo", new Color(0.95f, 0.94f, 0.92f), 0.1f, false, new Color(0.30f, 0.30f, 0.29f)));
-            // pared hacia el vestíbulo con puerta
-            Box(hall, new Vector3(-4.75f, WallH / 2f, 0f), new Vector3(4.8f, WallH, 0.3f), wall);
-            Box(hall, new Vector3(4.75f, WallH / 2f, 0f), new Vector3(4.8f, WallH, 0.3f), wall);
-            Box(hall, new Vector3(0f, (4.2f + WallH) / 2f, 0f), new Vector3(4.7f, WallH - 4.2f, 0.3f), wall);
+            // pared hacia el pasillo con una entrada enorme
+            float side = HalfW - DoorHalf;
+            Box(hall, new Vector3(-(DoorHalf + side / 2f), WallH / 2f, 0f), new Vector3(side + 0.3f, WallH, 0.3f), wall);
+            Box(hall, new Vector3(DoorHalf + side / 2f, WallH / 2f, 0f), new Vector3(side + 0.3f, WallH, 0.3f), wall);
+            Box(hall, new Vector3(0f, (DoorH + WallH) / 2f, 0f), new Vector3(DoorHalf * 2f + 0.1f, WallH - DoorH, 0.3f), wall);
             // laterales y fondo
             Box(hall, new Vector3(-HalfW, WallH / 2f, HallLen / 2f), new Vector3(0.3f, WallH, HallLen + 0.3f), wall);
             Box(hall, new Vector3(HalfW, WallH / 2f, HallLen / 2f), new Vector3(0.3f, WallH, HallLen + 0.3f), wall);
@@ -576,17 +663,17 @@ namespace MuseoAutista.EditorTools
             Box(hall, new Vector3(HalfW - 0.16f, 0.6f, HallLen / 2f), new Vector3(0.02f, 1.2f, HallLen - 0.3f), wains, false);
             Box(hall, new Vector3(0f, 0.6f, HallLen - 0.16f), new Vector3(13.7f, 1.2f, 0.02f), wains, false);
             // marco de la puerta
-            foreach (float x in new[] { -2.4f, 2.4f })
-                Box(hall, new Vector3(x, 2.1f, 0f), new Vector3(0.25f, 4.2f, 0.45f), wains);
-            Box(hall, new Vector3(0f, 4.3f, 0f), new Vector3(5.05f, 0.25f, 0.45f), wains);
+            foreach (float x in new[] { -DoorHalf - 0.15f, DoorHalf + 0.15f })
+                Box(hall, new Vector3(x, DoorH / 2f, 0f), new Vector3(0.4f, DoorH, 0.7f), wains);
+            Box(hall, new Vector3(0f, DoorH + 0.15f, 0f), new Vector3(DoorHalf * 2f + 0.7f, 0.3f, 0.7f), wains);
             for (int i = 0; i < 3; i++)
                 Box(hall, new Vector3(0f, WallH - 0.03f, 4f + i * 5f), new Vector3(2.6f, 0.04f, 1.2f), Glow("Lampara", new Color(1f, 0.97f, 0.9f), 1f), false);
 
             // letrero sobre la puerta (lado vestíbulo) y mural del fondo
-            var door = WorldCanvas("LetreroPuerta", hall, new Vector3(0f, 5.1f, -0.17f), Quaternion.identity, new Vector2(4.6f, 1.2f), 100f);
-            Img(door.transform, Vector2.zero, new Vector2(460f, 120f), h.color, RoundSprite, true);
-            Label(door.transform, h.title, new Vector2(0f, 15f), new Vector2(440f, 70f), 46, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
-            Label(door.transform, h.name, new Vector2(0f, -35f), new Vector2(440f, 30f), 22, new Color(1f, 0.95f, 0.85f));
+            var door = WorldCanvas("LetreroPuerta", hall, new Vector3(0f, (DoorH + 0.3f + WallH) / 2f, -0.37f), Quaternion.identity, new Vector2(6.2f, 1.1f), 100f);
+            Img(door.transform, Vector2.zero, new Vector2(620f, 110f), h.color, RoundSprite, true);
+            Label(door.transform, h.title, new Vector2(0f, 14f), new Vector2(600f, 70f), 50, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
+            Label(door.transform, h.name + "  ·  " + h.direction, new Vector2(0f, -35f), new Vector2(600f, 30f), 22, new Color(1f, 0.95f, 0.85f));
 
             var mural = WorldCanvas("Mural", hall, new Vector3(0f, 4.3f, HallLen - 0.17f), Quaternion.identity, new Vector2(7f, 1.6f), 100f);
             Img(mural.transform, Vector2.zero, new Vector2(700f, 160f), h.color, RoundSprite, true);
@@ -607,6 +694,8 @@ namespace MuseoAutista.EditorTools
                 case "carros": FillCarros(hall, eye1, eye2); break;
             }
 
+            AddContemplateButtons(hall);
+
             // pedestal de la pieza faltante
             string accepts = h.id == "aviones" ? "minijet" : h.id == "dinosaurios" ? "huevo" : h.id == "hongos" ? "hongo" : "minicarro";
             var sp = Node("PedestalPiezaFaltante", hall, new Vector3(4.3f, 0f, 13f));
@@ -617,9 +706,33 @@ namespace MuseoAutista.EditorTools
             AccentBar(sign, new Color(0.95f, 0.72f, 0.45f));
             Label(sign.transform, "PIEZA FALTANTE", new Vector2(0f, 280f), new Vector2(1250f, 80f), 58, PanelText, TextAnchor.MiddleCenter, FontStyle.Bold);
             socket.statusText = Label(sign.transform, "", new Vector2(0f, 60f), new Vector2(1250f, 260f), 48, PanelText);
-            socket.waitingMessage = "Trae la pieza desde la mesa del vestíbulo\ny mira el aro amarillo para colocarla.";
+            socket.waitingMessage = "Trae la pieza desde la mesa del pasillo\ny mira el aro amarillo para colocarla.";
             progressTexts.Add(Label(sign.transform, "", new Vector2(0f, -250f), new Vector2(1250f, 150f), 46, new Color(0.25f, 0.45f, 0.30f), TextAnchor.MiddleCenter));
             finishButtons.Add(ButtonOnPanel("Finalizar recorrido", sign.transform, -520f, ButtonAction.LoadScene, SceneNames.Felicitaciones, false, 0.95f).gameObject);
+        }
+
+        /// <summary>Agrega a cada placa de la sala un botón "Contemplar" ligado a la pieza más cercana.</summary>
+        static void AddContemplateButtons(Transform hall)
+        {
+            var exhibits = hall.GetComponentsInChildren<ExhibitAnimator>(true);
+            foreach (Transform t in hall)
+            {
+                if (!t.name.StartsWith("Placa_")) continue;
+                var canvas = t.Find("Placa");
+                if (canvas == null || exhibits.Length == 0) continue;
+                ExhibitAnimator best = null;
+                float bestD = float.MaxValue;
+                foreach (var e in exhibits)
+                {
+                    Vector3 d = e.transform.position - t.position;
+                    d.y *= 0.3f;
+                    if (d.sqrMagnitude < bestD) { bestD = d.sqrMagnitude; best = e; }
+                }
+                var b = ButtonOnPanel("Contemplar", canvas, -440f, ButtonAction.None, null, false, 0.95f, 52, 0.16f);
+                b.normalColor = new Color(0.42f, 0.34f, 0.55f);
+                b.hoverColor = new Color(0.56f, 0.46f, 0.72f);
+                b.gameObject.AddComponent<ContemplateButton>().target = best;
+            }
         }
 
         // ---------------------------------------------------------------- contenido de cada sala
@@ -831,8 +944,8 @@ namespace MuseoAutista.EditorTools
             model.transform.SetParent(root.transform, false);
             model.transform.localPosition = Vector3.zero;
             var col = root.AddComponent<SphereCollider>();
-            col.radius = 0.28f;
-            col.center = new Vector3(0f, 0.17f, 0f);
+            col.radius = 0.2f;
+            col.center = new Vector3(0f, 0.15f, 0f);
             var g = root.AddComponent<Grabbable>();
             g.itemId = id;
             g.displayName = name;

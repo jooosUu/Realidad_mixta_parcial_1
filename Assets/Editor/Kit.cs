@@ -31,6 +31,7 @@ namespace MuseoAutista.EditorTools
 
         static readonly Dictionary<string, Material> mats = new Dictionary<string, Material>();
         public static Sprite DotSprite, RingSprite, FillSprite, RoundSprite;
+        public static Sprite NoteIcon, PlayIcon, PauseIcon, PrevIcon, NextIcon, PhoneIcon;
         public static Material OverlayMat, FaderMat;
         public static Texture2D FloorTex, GrassTex;
         static int meshCounter;
@@ -57,6 +58,12 @@ namespace MuseoAutista.EditorTools
             RingSprite = MakeSprite("reticle_ring", 256, (x, y, s) => Ring(x, y, s, 0.46f, 0.36f, true));
             FillSprite = MakeSprite("reticle_fill", 256, (x, y, s) => Ring(x, y, s, 0.44f, 0.38f, false));
             RoundSprite = MakeSprite("round_rect", 64, RoundRect, 24);
+            NoteIcon = MakeSprite("icon_note", 128, (x, y, n) => Icon(x, y, n, IconNote));
+            PlayIcon = MakeSprite("icon_play", 128, (x, y, n) => Icon(x, y, n, (u, v) => Tri(u, v, 0.3f, 0.75f)));
+            PauseIcon = MakeSprite("icon_pause", 128, (x, y, n) => Icon(x, y, n, (u, v) => Bar(u, v, 0.3f, 0.43f) || Bar(u, v, 0.57f, 0.7f)));
+            PrevIcon = MakeSprite("icon_prev", 128, (x, y, n) => Icon(x, y, n, (u, v) => Bar(u, v, 0.22f, 0.32f) || Tri(1f - u, v, 0.28f, 0.72f)));
+            NextIcon = MakeSprite("icon_next", 128, (x, y, n) => Icon(x, y, n, (u, v) => Bar(u, v, 0.68f, 0.78f) || Tri(u, v, 0.28f, 0.72f)));
+            PhoneIcon = MakeSprite("icon_phone", 128, (x, y, n) => Icon(x, y, n, IconPhone));
             FloorTex = MakeTexture("floor_tiles", 512, FloorTile);
             GrassTex = MakeTexture("grass", 256, Grass);
 
@@ -216,6 +223,53 @@ namespace MuseoAutista.EditorTools
             return new Color(1f, 1f, 1f, Mathf.Clamp01(0.5f - d));
         }
 
+        static Color Icon(int x, int y, int s, System.Func<float, float, bool> inside)
+        {
+            // 4x supermuestreo para bordes suaves.
+            int hits = 0;
+            for (int i = 0; i < 4; i++)
+            {
+                float u = (x + 0.25f + (i % 2) * 0.5f) / s, v = (y + 0.25f + (i / 2) * 0.5f) / s;
+                if (inside(u, v)) hits++;
+            }
+            return new Color(1f, 1f, 1f, hits / 4f);
+        }
+
+        static bool Tri(float u, float v, float x0, float x1)
+        {
+            if (u < x0 || u > x1) return false;
+            float h = 0.25f * (1f - (u - x0) / (x1 - x0));
+            return Mathf.Abs(v - 0.5f) <= h;
+        }
+
+        static bool Bar(float u, float v, float x0, float x1) => u >= x0 && u <= x1 && v >= 0.25f && v <= 0.75f;
+
+        static bool IconNote(float u, float v)
+        {
+            bool head1 = (u - 0.33f) * (u - 0.33f) / 0.012f + (v - 0.28f) * (v - 0.28f) / 0.008f <= 1f;
+            bool head2 = (u - 0.68f) * (u - 0.68f) / 0.012f + (v - 0.36f) * (v - 0.36f) / 0.008f <= 1f;
+            bool stem1 = u >= 0.41f && u <= 0.46f && v >= 0.28f && v <= 0.8f;
+            bool stem2 = u >= 0.76f && u <= 0.81f && v >= 0.36f && v <= 0.88f;
+            float top = 0.8f + (u - 0.41f) * (0.08f / 0.4f);
+            bool beam = u >= 0.41f && u <= 0.81f && v >= top - 0.07f && v <= top;
+            return head1 || head2 || stem1 || stem2 || beam;
+        }
+
+        static bool IconPhone(float u, float v)
+        {
+            bool outer = u >= 0.3f && u <= 0.7f && v >= 0.15f && v <= 0.85f;
+            bool inner = u >= 0.36f && u <= 0.64f && v >= 0.27f && v <= 0.78f;
+            bool button = (u - 0.5f) * (u - 0.5f) + (v - 0.21f) * (v - 0.21f) <= 0.0008f;
+            return (outer && !inner && !button) || IconNoteSmall(u, v);
+        }
+
+        static bool IconNoteSmall(float u, float v)
+        {
+            bool head = (u - 0.47f) * (u - 0.47f) / 0.002f + (v - 0.42f) * (v - 0.42f) / 0.0014f <= 1f;
+            bool stem = u >= 0.5f && u <= 0.525f && v >= 0.42f && v <= 0.66f;
+            return head || stem;
+        }
+
         static Color FloorTile(int x, int y, int s)
         {
             int tiles = 2, tile = s / tiles;
@@ -255,6 +309,13 @@ namespace MuseoAutista.EditorTools
             go.transform.localRotation = Quaternion.Euler(euler);
             go.transform.localScale = scale;
             if (!collider) Object.DestroyImmediate(go.GetComponent<Collider>());
+            else if (type == PrimitiveType.Cylinder)
+            {
+                // El CapsuleCollider de un cilindro ancho y bajo se vuelve una esfera enorme
+                // que tapa lo que está encima (p. ej. las piezas de la mesa). Usar la malla real.
+                Object.DestroyImmediate(go.GetComponent<Collider>());
+                go.AddComponent<MeshCollider>().sharedMesh = go.GetComponent<MeshFilter>().sharedMesh;
+            }
             var r = go.GetComponent<MeshRenderer>();
             r.sharedMaterial = m;
             r.shadowCastingMode = ShadowCastingMode.Off;
@@ -482,6 +543,67 @@ namespace MuseoAutista.EditorTools
             return gb;
         }
 
+        public static GazeButton IconButton(string name, Sprite icon, Transform parent, Vector3 pos, float size, float dwell = 1.0f)
+        {
+            var b = Button("", parent, pos, Quaternion.identity, new Vector2(size, size), ButtonAction.None);
+            b.name = "Boton_" + name;
+            var canvas = b.transform.Find("Etiqueta");
+            var img = Img(canvas, Vector2.zero, new Vector2(size * 1000f * 0.8f, size * 1000f * 0.8f), Color.white, icon);
+            img.name = "Icono";
+            b.dwellTime = dwell;
+            var bg = b.transform.Find("Fondo");
+            bg.localScale = new Vector3(bg.localScale.x, bg.localScale.y, 0.02f);
+            canvas.localPosition = new Vector3(0f, 0f, -0.015f);
+            return b;
+        }
+
+        /// <summary>Reproductor de música en la esquina inferior izquierda (ver MusicPlayerUI).</summary>
+        static void MusicUI(Transform rig, Transform head)
+        {
+            var root = new GameObject("Reproductor").transform;
+            root.SetParent(rig, false);
+            var anchor = Node("Ancla", root, new Vector3(-0.5f, 1.0f, 0.9f));
+            var ui = root.gameObject.AddComponent<MusicPlayerUI>();
+            ui.head = head;
+            ui.anchor = anchor;
+            ui.icon = IconButton("Musica", NoteIcon, anchor, Vector3.zero, 0.15f, 0.8f);
+
+            var panel = Panel("Panel", anchor, Vector3.zero, Quaternion.identity, new Vector2(0.56f, 0.3f), new Color(0.16f, 0.17f, 0.21f, 0.96f));
+            ui.panel = panel.gameObject;
+            // Pantallita con la portada de la canción, encima del panel.
+            Img(panel.transform, new Vector2(0f, 300f), new Vector2(270f, 270f), new Color(0.10f, 0.10f, 0.13f, 1f), RoundSprite, true);
+            var coverRt = Rect("Portada", panel.transform, new Vector2(0f, 300f), new Vector2(240f, 240f));
+            ui.cover = coverRt.gameObject.AddComponent<RawImage>();
+            ui.cover.raycastTarget = false;
+            ui.defaultCover = NoteIcon.texture;
+            var col = panel.GetComponent<BoxCollider>();
+            col.center = new Vector3(0f, 140f, 0f);
+            col.size = new Vector3(560f, 600f, 20f);
+            ui.title = Label(panel.transform, "", new Vector2(0f, 95f), new Vector2(520f, 60f), 38, Color.white);
+            ui.title.resizeTextForBestFit = true;
+            ui.title.resizeTextMinSize = 18;
+            ui.title.resizeTextMaxSize = 34;
+            ui.title.verticalOverflow = VerticalWrapMode.Truncate;
+            ui.status = Label(panel.transform, "", new Vector2(0f, 55f), new Vector2(520f, 30f), 24, new Color(0.7f, 0.85f, 0.9f));
+            float y = -45f;
+            ui.prev = IconButton("Anterior", PrevIcon, panel.transform, Vector3.zero, 0.1f);
+            ui.playPause = IconButton("PlayPausa", PauseIcon, panel.transform, Vector3.zero, 0.1f);
+            ui.next = IconButton("Siguiente", NextIcon, panel.transform, Vector3.zero, 0.1f);
+            ui.phone = IconButton("Celular", PhoneIcon, panel.transform, Vector3.zero, 0.1f);
+            var list = new[] { ui.prev, ui.playPause, ui.next, ui.phone };
+            for (int i = 0; i < list.Length; i++)
+            {
+                var t = list[i].transform;
+                t.SetParent(panel.transform.parent, false);
+                t.localPosition = new Vector3(-0.195f + i * 0.13f, y / 1000f, -0.03f);
+                t.SetParent(panel.transform, true);
+            }
+            ui.phone.normalColor = new Color(0.35f, 0.35f, 0.45f);
+            ui.playPauseImage = ui.playPause.transform.Find("Etiqueta/Icono").GetComponent<Image>();
+            ui.playSprite = PlayIcon;
+            ui.pauseSprite = PauseIcon;
+        }
+
         // ------------------------------------------------------------------ jugador y escena
 
         public static PlayerRig Rig(Vector3 pos, float yaw, TeleportPoint start)
@@ -553,6 +675,8 @@ namespace MuseoAutista.EditorTools
             pr.holdPoint = hold;
             pr.fader = fader;
             pr.startPoint = start;
+
+            MusicUI(rig.transform, camGo.transform);
 
             new GameObject("Cardboard").AddComponent<CardboardManager>();
             return pr;

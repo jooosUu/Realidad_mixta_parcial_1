@@ -29,16 +29,20 @@ namespace MuseoAutista
         float hoverBlend;
 
         public GazeInteractable Current => current;
+        /// <summary>Objeto que el rayo está tocando (interactivo o no).</summary>
+        public Transform HitTransform { get; private set; }
 
         void Update()
         {
             Ray ray = new Ray(transform.position, transform.forward);
             float distance = idleDistance;
             GazeInteractable target = null;
+            HitTransform = null;
 
             if (Physics.Raycast(ray, out RaycastHit hit, maxDistance, ~0, QueryTriggerInteraction.Collide))
             {
                 distance = hit.distance;
+                HitTransform = hit.transform;
                 target = hit.collider.GetComponentInParent<GazeInteractable>();
                 if (target != null && !target.IsInteractable) target = null;
             }
