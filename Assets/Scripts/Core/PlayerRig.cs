@@ -49,7 +49,11 @@ namespace MuseoAutista
             Sfx.Play("teleport");
             if (fader != null) yield return fader.Fade(1f, 0.15f);
             Vector3 p = point.transform.position;
+            // En la versión joystick hay CharacterController: apagarlo para poder mover el jugador.
+            var cc = GetComponent<CharacterController>();
+            if (cc != null) cc.enabled = false;
             transform.position = new Vector3(p.x, transform.position.y, p.z);
+            if (cc != null) cc.enabled = true;
             Current = point;
             GameState.VisitHall(point.hallId);
             Teleported?.Invoke(point);

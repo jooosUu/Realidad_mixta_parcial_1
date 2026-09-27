@@ -38,6 +38,7 @@ namespace MuseoAutista
 
         void Update()
         {
+            if (AppMode.Joystick) return; // lo maneja JoystickControls
             if (Application.isEditor) { MouseLook(); return; }
             if (XRActive) return;
             if (AttitudeLook()) return;

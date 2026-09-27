@@ -28,7 +28,21 @@ namespace MuseoAutista
         bool fired;
         float hoverBlend;
 
+        public static GazePointer Instance { get; private set; }
+
         public GazeInteractable Current => current;
+
+        void Awake() { Instance = this; }
+
+        /// <summary>Activa lo que está bajo el puntero (botón de acción de la versión joystick).</summary>
+        public bool ActivateCurrent()
+        {
+            if (current == null || !current.IsInteractable) return false;
+            fired = true;
+            timer = current.dwellTime;
+            current.OnGazeActivate();
+            return true;
+        }
         /// <summary>Objeto que el rayo está tocando (interactivo o no).</summary>
         public Transform HitTransform { get; private set; }
 
@@ -98,6 +112,7 @@ namespace MuseoAutista
 
         static bool TriggerPressed()
         {
+            if (AppMode.Joystick) return JoystickControls.TapThisFrame;
 #if UNITY_EDITOR
             if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame) return true;
             if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame) return true;

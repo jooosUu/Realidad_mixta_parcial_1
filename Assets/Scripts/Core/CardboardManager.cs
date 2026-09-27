@@ -19,6 +19,12 @@ namespace MuseoAutista
         {
             Screen.sleepTimeout = SleepTimeout.NeverSleep;
             Application.targetFrameRate = 60;
+            if (AppMode.Joystick)
+            {
+                // Versión pantalla completa: sin Cardboard, con joystick virtual.
+                gameObject.AddComponent<JoystickControls>();
+                return;
+            }
 #if !UNITY_EDITOR
             if (!askedForViewer && !Api.HasDeviceParams())
             {
@@ -37,6 +43,7 @@ namespace MuseoAutista
 
         public static void Recenter()
         {
+            if (AppMode.Joystick) return;
 #if !UNITY_EDITOR
             Api.Recenter();
 #endif
@@ -45,6 +52,7 @@ namespace MuseoAutista
 #if !UNITY_EDITOR
         void Update()
         {
+            if (AppMode.Joystick) return;
             if (Api.IsGearButtonPressed) Api.ScanDeviceParams();
 
             if (Api.IsCloseButtonPressed)

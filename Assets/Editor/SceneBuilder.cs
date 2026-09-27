@@ -167,6 +167,48 @@ namespace MuseoAutista.EditorTools
             BuildApk();
         }
 
+        /// <summary>
+        /// Versión aparte "Joystick": pantalla completa, sin Cardboard, con joystick virtual.
+        /// Mismas escenas; se compila con el símbolo MUSEO_JOYSTICK y otro identificador de app.
+        /// </summary>
+        [MenuItem("Museo Autista/5. Compilar APK Joystick (sin visor)")]
+        public static void BuildApkJoystick()
+        {
+            ConfigureProject();
+            var nt = NamedBuildTarget.Android;
+            string defines = PlayerSettings.GetScriptingDefineSymbols(nt);
+            string product = PlayerSettings.productName;
+            string id = PlayerSettings.GetApplicationIdentifier(nt);
+            EditorBuildSettings.TryGetConfigObject(XRGeneralSettings.settingsKey, out XRGeneralSettingsPerBuildTarget perTarget);
+            var xr = perTarget != null ? perTarget.SettingsForBuildTarget(BuildTargetGroup.Android) : null;
+            try
+            {
+                PlayerSettings.SetScriptingDefineSymbols(nt, (defines + ";MUSEO_JOYSTICK").Trim(';'));
+                PlayerSettings.productName = "Museo Autista (Joystick)";
+                PlayerSettings.SetApplicationIdentifier(nt, "com.juanj.museoautista.joystick");
+                if (xr != null) { xr.InitManagerOnStart = false; EditorUtility.SetDirty(xr); }
+                AssetDatabase.SaveAssets();
+                Directory.CreateDirectory("Builds");
+                var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+                {
+                    scenes = Array.ConvertAll(EditorBuildSettings.scenes, s => s.path),
+                    locationPathName = "Builds/MuseoAutista_Joystick.apk",
+                    target = BuildTarget.Android,
+                    options = BuildOptions.None,
+                });
+                Debug.Log("[MuseoAutista] Resultado APK Joystick: " + report.summary.result + " tamaño " + report.summary.totalSize);
+                if (Application.isBatchMode && report.summary.result != BuildResult.Succeeded) EditorApplication.Exit(1);
+            }
+            finally
+            {
+                PlayerSettings.SetScriptingDefineSymbols(nt, defines);
+                PlayerSettings.productName = product;
+                PlayerSettings.SetApplicationIdentifier(nt, id);
+                if (xr != null) { xr.InitManagerOnStart = true; EditorUtility.SetDirty(xr); }
+                AssetDatabase.SaveAssets();
+            }
+        }
+
         public static void BatchApk()
         {
             ConfigureProject();
