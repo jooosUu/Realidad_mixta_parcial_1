@@ -927,10 +927,6 @@ namespace MuseoAutista.EditorTools
             // Fósiles
             Place(hall, Exhibit("sauropodo_fosil", () => ModelFactory.SauropodSkeleton("Esqueleto_Sauropodo"), true), C16, 90f, 1f);
             Plaque(hall, PC16, e2, "Esqueleto de saurópodo", "Dinosaurio de cuello largo. Los huesos de su cuello tenían huecos de aire para pesar menos. Míralo para desarmarlo.", acc);
-            var ped = Node("PedestalCraneo", hall, new Vector3(-5.5f, 0f, 9.75f));
-            Pedestal(ped, 0.8f, acc, 0.65f);
-            Place(ped, Exhibit("craneo_trex", () => ModelFactory.TRexSkull("Craneo_TRex"), true), new Vector3(0f, 0.8f, 0f), 90f, 1f);
-            Plaque(hall, new Vector3(-3.2f, 0f, 8.3f), EyeMid, "Cráneo de T-Rex", "Medía 1,5 m. Sus dientes, del tamaño de un plátano, se renovaban durante toda su vida.", acc);
             Place(hall, Exhibit("raptor_fosil", () => ModelFactory.RaptorSkeleton("Esqueleto_Raptor"), true), new Vector3(5.4f, 0f, 9.75f), 0f, 0.85f);
             Plaque(hall, new Vector3(3.2f, 0f, 8.3f), EyeMid, "Fósil de Velociraptor", "Así se ve el raptor de al lado sin piel ni plumas: más de 200 huesos convertidos en piedra.", acc);
 

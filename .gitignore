@@ -18,6 +18,7 @@
 *.apk
 *.aab
 *.unitypackage
+*.pdf
 .vs/
 .vscode/
 .idea/
