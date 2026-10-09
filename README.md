@@ -17,8 +17,21 @@ El recorrido está montado a lo largo de un pasillo central continuo con entrada
 - **Modo Contemplar:** Si miras fijamente una pieza, el entorno se oscurece tipo foco de museo con musiquita relajante mientras la pieza gira solita.
 - **Reproductor de música:** Abajo a la izquierda tienes un reproductor flotante para pausar, cambiar de canción o poner temas mientras paseas por el pasillo.
 
-### Descarga e instalación del APK
-1. Ve a la pestaña de [Releases](https://github.com/jooosUu/Realidad_mixta_parcial_1/releases) de este repositorio.
-2. Descarga el archivo `MuseoAutistaVR.apk`.
-3. Ábrelo en tu teléfono Android (activa "permitir orígenes desconocidos" si te lo pide).
-4. Mételo a las gafas Cardboard y listo.
+### Modalidades disponibles y Descarga del APK
+El proyecto cuenta con dos compilaciones listas para instalar desde la sección de [Releases](https://github.com/jooosUu/Realidad_mixta_parcial_1/releases/tag/v1.0):
+
+1. **Versión VR Cardboard (`MuseoAutistaVR.apk`):**
+   - Diseñada para visores de realidad virtual tipo Google Cardboard.
+   - Navegación suave con teletransporte Gaze (miras al piso) e interacción visual.
+
+2. **Versión Joystick / Pantalla Completa (`MuseoAutista_Joystick.apk`):**
+   - Diseñada para jugar **directamente en el celular a pantalla completa**, sin necesidad de ningún visor VR.
+   - Incluye **joystick táctil** en pantalla (a la izquierda) para caminar libremente por el museo.
+   - Arrastre con el dedo en pantalla para rotar la mirada/cámara.
+   - Botón virtual de **ACCIÓN** para interactuar, recoger tickets/piezas perdidas y activar exhibiciones.
+
+### Instalación
+1. Ve a la pestaña de [Releases](https://github.com/jooosUu/Realidad_mixta_parcial_1/releases/tag/v1.0) y descarga el APK según la modalidad deseada (`MuseoAutistaVR.apk` o `MuseoAutista_Joystick.apk`).
+2. Abre el archivo en tu teléfono Android (habilita la opción de permitir la instalación desde orígenes desconocidos si el sistema lo solicita).
+3. ¡Abre la app y disfruta del recorrido!
+
